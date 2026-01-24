@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{API_NAME}}-deployment"
+  labels:
+    app: {{API_NAME}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{API_NAME}}
+  template:
+    metadata:
+      labels:
+        app: {{API_NAME}}
+    spec:
+      containers:
+      - name: {{API_NAME}}
+        image: {{IMAGE_NAME}}  # Placeholder for bazaar-payment or bazaar-gst
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3000
+        resources:
+          limits:
+            memory: "128Mi"    # Keeping it tiny for your 8GB RAM
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
