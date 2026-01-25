@@ -15,8 +15,20 @@ const OUTPUT_DIR = path.join(__dirname, './deployments');
 
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR);
 
-app.post('/deploy', (req, res) => {
+const cleanupAPI = (api_name) => {
+    console.log(`🧹 Cleaning up existing deployment for ${api_name}...`);
+    try {
+        // Deletes specific deployment and service to allow others to coexist
+        execSync(`kubectl delete deployment ${api_name} --ignore-not-found`);
+        execSync(`kubectl delete service ${api_name}-service --ignore-not-found`);
+    } catch (e) {
+        console.log(`Nothing to clean up for ${api_name}.`);
+    }
+};
+
+app.post('/deploy', async (req, res) => {
     const { api_name, image_name } = req.body;
+    cleanupAPI(api_name);
 
     if (!api_name || !image_name) {
         return res.status(400).json({ status: "error", message: "Missing api_name or image_name" });
@@ -39,7 +51,7 @@ app.post('/deploy', (req, res) => {
         // 3. Save processed YAMLs
         const deployPath = path.join(OUTPUT_DIR, `${api_name}-deploy.yaml`);
         const svcPath = path.join(OUTPUT_DIR, `${api_name}-svc.yaml`);
-        
+
         fs.writeFileSync(deployPath, deploymentYaml);
         fs.writeFileSync(svcPath, serviceYaml);
 
@@ -54,18 +66,18 @@ app.post('/deploy', (req, res) => {
         const maxAttempts = 12; // Gives it about 45-60 seconds total
 
         console.log("⏳ Waiting for Pod to be 'Running' and Service to be reachable...");
-        
+
         while (attempts < maxAttempts) {
             try {
                 // Wait 5 seconds between checks
-                execSync('sleep 5'); 
-                
+                execSync('sleep 5');
+
                 // minikube service --url can fail if pod isn't ready, so we pipe to catch errors
                 const output = execSync(`minikube service ${api_name}-service --url`, { stdio: 'pipe' }).toString();
-                
+
                 if (output && output.includes("http")) {
                     serviceUrl = output.trim();
-                    break; 
+                    break;
                 }
             } catch (e) {
                 attempts++;
@@ -78,10 +90,23 @@ app.post('/deploy', (req, res) => {
         }
 
         console.log(`✅ Deployment Complete: ${serviceUrl}`);
+
+        // Define specific test endpoints for different APIs
+        let finalUrl = serviceUrl;
+        if (api_name === 'currency') {
+            finalUrl = `${serviceUrl}/convert/USD/INR`;
+        } else if (api_name === 'notification') {
+            finalUrl = `${serviceUrl}/send-sms`;
+        } else if (api_name === 'email') {
+            finalUrl = `${serviceUrl}/send-email`;
+        } else if (api_name === 'finance') {
+            finalUrl = `${serviceUrl}/stock-price`;
+        }
+
         res.json({
             status: "success",
             api: api_name,
-            url: serviceUrl
+            url: finalUrl
         });
 
     } catch (error) {

@@ -1,7 +1,9 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
+app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -15,10 +17,15 @@ app.get('/', (req, res) => {
 
 
 app.post('/pay', (req, res) => {
+    const isSimulation = req.headers['x-simulation'] === 'true';
+
     res.json({
         status: "success",
+        mode: isSimulation ? "Simulation" : "Production-Mock",
         transactionId: `TXN-${Math.floor(Math.random() * 1000000)}`,
-        message: "Payment processed via APIBazaar Mock"
+        amount: req.body.amount || "0.00",
+        currency: req.body.currency || "USD",
+        message: isSimulation ? "Simulated payment successful" : "Payment processed via APIBazaar Mock"
     });
 });
 

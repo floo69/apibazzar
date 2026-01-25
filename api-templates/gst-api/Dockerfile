@@ -21,7 +21,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/app.js ./
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --only=production && npm cache clean --force
 
 # Expose the API port
 EXPOSE 3000

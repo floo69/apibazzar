@@ -1,7 +1,9 @@
 const express = require('express');
+const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
+app.use(cors());
 app.use(express.json());
 
 const mockGstData = {
@@ -18,12 +20,27 @@ app.get('/lookup/:gstin', (req, res) => {
   const gstin = req.params.gstin.toUpperCase();
   const data = mockGstData[gstin];
 
+  // Simulation Mode
+  if (req.headers['x-simulation'] === 'true' && !data) {
+    return res.json({
+      success: true,
+      mode: "simulation",
+      data: {
+        business_name: "Simulated Enterprise Ltd",
+        status: "Active",
+        registration_date: "2023-01-15",
+        taxpayer_type: "Regular",
+        address: "Digital Twin Tower, Cyber Hub, Gurgaon, 122002"
+      }
+    });
+  }
+
   if (data) {
     res.json({ success: true, data });
   } else {
-    res.status(404).json({ 
-      success: false, 
-      message: "GSTIN not found in mock database. Try: 27AAACV9876F1Z1" 
+    res.status(404).json({
+      success: false,
+      message: "GSTIN not found in mock database. Try: 27AAACV9876F1Z1"
     });
   }
 });
