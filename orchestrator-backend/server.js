@@ -27,7 +27,7 @@ const cleanupAPI = (api_name) => {
 };
 
 app.post('/deploy', async (req, res) => {
-    const { api_name, image_name } = req.body;
+    const { api_name, image_name, custom_api_key } = req.body;
     cleanupAPI(api_name);
 
     if (!api_name || !image_name) {
@@ -46,6 +46,74 @@ app.post('/deploy', async (req, res) => {
 
         // 2. Replace Placeholders (using global regex to catch all instances)
         deploymentYaml = deploymentYaml.replace(/{{API_NAME}}/g, api_name).replace(/{{IMAGE_NAME}}/g, image_name);
+
+        // Inject Environment Variables
+        let envVarsBlock = "";
+
+        // Handle custom API keys if provided
+        if (custom_api_key) {
+            if (api_name === 'currency') {
+                envVarsBlock = `
+        env:
+        - name: CURRENCY_API_KEY
+          value: "${custom_api_key}"`;
+            } else if (api_name === 'email') {
+                envVarsBlock = `
+        env:
+        - name: RESEND_API_KEY
+          value: "${custom_api_key}"`;
+            } else if (api_name === 'finance') {
+                envVarsBlock = `
+        env:
+        - name: FINANCE_API_KEY
+          value: "${custom_api_key}"`;
+            } else if (api_name === 'notification') {
+                // For Twilio, expect custom_api_key to be in format: "SID:TOKEN:PHONE"
+                const parts = custom_api_key.split(':');
+                if (parts.length === 3) {
+                    envVarsBlock = `
+        env:
+        - name: TWILIO_SID
+          value: "${parts[0]}"
+        - name: TWILIO_TOKEN
+          value: "${parts[1]}"
+        - name: TWILIO_PHONE
+          value: "${parts[2]}"`;
+                } else {
+                    console.log("Invalid Twilio credentials format. Expected: SID:TOKEN:PHONE");
+                }
+            } else if (api_name === 'tmdb') {
+                envVarsBlock = `
+        env:
+        - name: MOVIE_API_TOKEN
+          value: "${custom_api_key}"`;
+            }
+        } else if (api_name === 'tmdb') {
+            // Fallback to reading from .env file for tmdb if no custom key
+            try {
+                const envPath = path.join(__dirname, '../api-templates/movie-api/.env');
+                if (fs.existsSync(envPath)) {
+                    const envContent = fs.readFileSync(envPath, 'utf8');
+                    const match = envContent.match(/MOVIE_API_TOKEN=(.+)/);
+                    if (match) {
+                        envVarsBlock = `
+        env:
+        - name: MOVIE_API_TOKEN
+          value: "${match[1]}"`;
+                    }
+                }
+            } catch (ignore) {
+                console.log("Could not read .env for tmdb");
+            }
+        }
+
+        // If no env vars, remove the placeholder
+        if (!envVarsBlock) {
+            deploymentYaml = deploymentYaml.replace('{{ENV_VARS}}', '');
+        } else {
+            deploymentYaml = deploymentYaml.replace('{{ENV_VARS}}', envVarsBlock);
+        }
+
         serviceYaml = serviceYaml.replace(/{{API_NAME}}/g, api_name);
 
         // 3. Save processed YAMLs

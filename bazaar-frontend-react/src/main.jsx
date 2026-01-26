@@ -2,6 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import APIBazaar from './APIBazaar.jsx'
+import APIPlayground from './APIPlayground.jsx'
+import AnalyticsDashboard from './AnalyticsDashboard.jsx'
 import { LoginPage, SignupPage } from './Auth.jsx'
 import './index.css'
 
@@ -22,6 +24,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                 <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                 <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
                 <Route path="/" element={<ProtectedRoute><APIBazaar /></ProtectedRoute>} />
+                <Route path="/playground" element={<ProtectedRoute><APIPlayground /></ProtectedRoute>} />
+                <Route path="/analytics" element={<ProtectedRoute><AnalyticsDashboard /></ProtectedRoute>} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </BrowserRouter>

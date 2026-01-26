@@ -1,19 +1,18 @@
-# Stage 1: Build Stage (The "Kitchen")
+# Stage 1: Build Stage
 FROM node:20-alpine AS builder
 
-# Set the working directory
 WORKDIR /app
 
 # Copy package files first to leverage Docker cache
 COPY package*.json ./
 
-# Install ALL dependencies (including dev if any)
+# Install ALL dependencies
 RUN npm install
 
 # Copy the rest of your app code
 COPY . .
 
-# --- Stage 2: Production Stage (The "Serving Table") ---
+# Stage 2: Production Stage
 FROM node:20-alpine
 
 # Set to production for better performance
@@ -29,5 +28,5 @@ COPY --from=builder /app/node_modules ./node_modules
 # Expose the port your Express app runs on
 EXPOSE 3000
 
-# Use 'node' directly instead of 'npm start' to save memory and handle signals better
+# Use 'node' directly instead of 'npm start'
 CMD ["node", "app.js"]

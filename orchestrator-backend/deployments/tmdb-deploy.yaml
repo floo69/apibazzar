@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "tmdb-deployment"
+  labels:
+    app: tmdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tmdb
+  template:
+    metadata:
+      labels:
+        app: tmdb
+    spec:
+      containers:
+      - name: tmdb
+        image: bazaar-tmdb  # Placeholder for bazaar-payment or bazaar-gst
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3000
+        resources:
+          limits:
+            memory: "128Mi"    # Keeping it tiny for your 8GB RAM
+            cpu: "100m"
+        
+        env:
+        - name: MOVIE_API_TOKEN
+          value: "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI3OTM3YmNhZTgyNjI1N2FjODU4YzUzOTU0NTc1MDY1NSIsIm5iZiI6MTc2OTM2MDQzMC4xNDYsInN1YiI6IjY5NzY0YzJlZmJhMGQzMDM4ZDFhMGRiNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.P2UBvI8IGa_7pKiWXYlvZRSsyLhYFzquzeXN1Y56d6k"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10

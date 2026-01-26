@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "notification-deployment"
+  labels:
+    app: notification
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification
+  template:
+    metadata:
+      labels:
+        app: notification
+    spec:
+      # 1. FIX: Use Google DNS to bypass NXDOMAIN
+      dnsPolicy: None
+      dnsConfig:
+        nameservers:
+          - 8.8.8.8
+          - 8.8.4.4
+      containers:
+      - name: notification
+        # 2. FIX: Use Versioned Image
+        image: bazaar-notification:v2
+        imagePullPolicy: Never
+        # 3. FIX: Load Secrets for Credentials
+        envFrom:
+        - secretRef:
+            name: notification-secrets
+        env:
+        # 4. FIX: Force IPv4 for Node.js
+        - name: NODE_OPTIONS
+          value: "--dns-result-order=ipv4first"
+        ports:
+        - containerPort: 3000
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10

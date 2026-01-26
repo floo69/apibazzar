@@ -1,24 +1,26 @@
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm install
-
-COPY . .
-
+# Use a slim, secure base image
 FROM node:18-alpine
 
-WORKDIR /app
-
+# Set environment to production to skip dev-dependencies
 ENV NODE_ENV=production
 
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/app.js ./
+# Create and use a dedicated app directory
+WORKDIR /usr/src/app
 
-RUN npm install --only=production && npm cache clean --force
+# Copy package files first to leverage Docker layer caching
+COPY package*.json ./
 
+# Install only production dependencies
+RUN npm install --omit=dev
+
+# Copy the rest of your app code
+COPY . .
+
+# Run the container as a non-root user for security
+USER node
+
+# Match the port in your app.js
 EXPOSE 3000
 
+# Use 'node' directly instead of 'npm start' to handle signals properly
 CMD ["node", "app.js"]

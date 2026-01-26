@@ -1,9 +1,11 @@
 const express = require('express');
 const { Resend } = require('resend');
+const cors = require('cors');
 const app = express();
+
+app.use(cors());
 app.use(express.json());
 
-// Priority: 1. Header (x-api-key) | 2. Environment Variable (K8s) | 3. Hardcoded fallback
 const getResendClient = (req) => {
     const headerKey = req.headers['x-api-key'];
     const envKey = process.env.RESEND_API_KEY;
@@ -17,9 +19,27 @@ const getResendClient = (req) => {
     };
 };
 
-// IMPORTANT: Kubernetes LivenessProbe needs this /health endpoint!
 app.get('/health', (req, res) => {
     res.status(200).send('OK');
+});
+
+app.get('/debug-key', (req, res) => {
+    const headerKey = req.headers['x-api-key'];
+    const envKey = process.env.RESEND_API_KEY;
+    const fallbackKey = "re_9jd9Gknp_75EYakBLEomyJ61HftPCEEZn0";
+
+    const keyToUse = headerKey || envKey || fallbackKey;
+
+    res.json({
+        hasHeaderKey: !!headerKey,
+        headerKeyPreview: headerKey ? `${headerKey.substring(0, 8)}...` : null,
+        hasEnvKey: !!envKey,
+        envKeyPreview: envKey ? `${envKey.substring(0, 8)}...` : null,
+        usingFallback: keyToUse === fallbackKey,
+        mode: headerKey ? "BYOK (Header)" : (envKey ? "Managed (Env)" : "Fallback"),
+        keyLength: keyToUse.length,
+        startsWithRe: keyToUse.startsWith('re_')
+    });
 });
 
 app.post('/send-email', async (req, res) => {
@@ -56,16 +76,18 @@ app.post('/send-email', async (req, res) => {
         });
 
         if (data.error) {
-            // If it's a validation error and we are in fallback mode, suggest BYOK
-            // Resend SDK errors use 'name' instead of 'type'
+
             const errorType = data.error.name || data.error.type;
 
             if (errorType === 'validation_error' && mode === "Fallback") {
-                return res.status(401).json({
-                    status: "error",
-                    message: "Resend API Key is invalid. Please provide a valid key via 'x-api-key' header or set RESEND_API_KEY env var.",
-                    type: "auth_required",
-                    hint: "To bypass this for orchestration testing, use 'mock' as the x-api-key header."
+                console.log(`🛠️ [AUTO-SIMULATED] Invalid API key, returning simulation for ${to}`);
+                return res.json({
+                    status: "success",
+                    mode: "Simulation (Auto - Invalid Key)",
+                    id: "sim_" + Math.random().toString(36).substr(2, 9),
+                    provider: "Bazaar-Simulation-Sender",
+                    note: "Real email skipped - API key is invalid. Provide a valid key via 'x-api-key' header or RESEND_API_KEY env var to send real emails.",
+                    preview: `Email to ${to} with subject "${subject || 'Bazaar Notification'}" would be sent successfully with a valid key.`
                 });
             }
 

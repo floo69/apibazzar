@@ -24,6 +24,7 @@ spec:
           limits:
             memory: "128Mi"    # Keeping it tiny for your 8GB RAM
             cpu: "100m"
+        {{ENV_VARS}}
         livenessProbe:
           httpGet:
             path: /health

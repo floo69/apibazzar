@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Copy, Search, Zap, Code, ArrowRight, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
+import { Check, Copy, Search, Zap, Code, ArrowRight, ChevronRight, ExternalLink, Loader2, BarChart2, Bot } from 'lucide-react';
 import axios from 'axios';
 import confetti from 'canvas-confetti';
+import SmartAgent from './SmartAgent';
 
 const AVAILABLE_APIS = [
     {
@@ -138,7 +139,7 @@ const AVAILABLE_APIS = [
                 amount: 4999,
                 currency: "usd",
                 payment_method_types: ["card"],
-                status: "succeeded",
+                transaction_status: "succeeded",
                 created: Math.floor(Date.now() / 1000)
             }
         }
@@ -818,6 +819,18 @@ export default function APIBazaar() {
     const [testFormData, setTestFormData] = useState({});
     const [testLoading, setTestLoading] = useState(false);
     const [testResponse, setTestResponse] = useState(null);
+    const [customAPIKeys, setCustomAPIKeys] = useState({});
+    const [showKeyInput, setShowKeyInput] = useState({});
+    const [showAssistant, setShowAssistant] = useState(false);
+
+    const handleAIStackSelection = (apiIds) => {
+        setSelectedAPIs(apiIds);
+        confetti({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 }
+        });
+    };
     const userEmail = localStorage.getItem('userEmail') || 'User';
 
     const handleLogout = () => {
@@ -863,7 +876,8 @@ export default function APIBazaar() {
 
                 const response = await axios.post('http://localhost:5000/deploy', {
                     api_name: api.id,
-                    image_name: api.imageName
+                    image_name: api.imageName,
+                    custom_api_key: customAPIKeys[api.id] || undefined
                 });
 
                 if (response.data.status === 'success') {
@@ -955,26 +969,22 @@ export default function APIBazaar() {
                 url = `${baseUrl}/convert/${from}/${to}?amount=${amount}`;
             }
 
-            const headers = {
-                'X-Simulation': 'true'
-            };
-
             let response;
             if (config.method === 'POST') {
-                response = await axios.post(url, testFormData, { headers });
+                response = await axios.post(url, testFormData);
             } else {
                 // For GET requests with path params, don't send params again
                 if (config.usePathParams) {
-                    response = await axios.get(url, { headers });
+                    response = await axios.get(url);
                 } else {
-                    response = await axios.get(url, { params: testFormData, headers });
+                    response = await axios.get(url, { params: testFormData });
                 }
             }
 
             setTestResponse({
                 status: 'success',
                 data: response.data,
-                curl: `curl -X ${config.method} ${url} \\\n-H "Content-Type: application/json" \\\n-H "X-Simulation: true" ${config.method === 'POST' ? `\\\n-d '${JSON.stringify(testFormData, null, 2)}'` : ''}`
+                curl: `curl -X ${config.method} ${url} \\\n-H "Content-Type: application/json" ${config.method === 'POST' ? `\\\n-d '${JSON.stringify(testFormData, null, 2)}'` : ''}`
             });
         } catch (err) {
             setTestResponse({
@@ -1259,6 +1269,13 @@ export default function APIBazaar() {
                         </div>
                         <nav className="flex items-center gap-2">
                             <button
+                                onClick={() => setShowAssistant(true)}
+                                className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2 mr-2"
+                            >
+                                <Bot className="w-4 h-4" />
+                                AI Architect
+                            </button>
+                            <button
                                 onClick={() => setCurrentPage('catalog')}
                                 className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${currentPage === 'catalog'
                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
@@ -1266,6 +1283,19 @@ export default function APIBazaar() {
                                     }`}
                             >
                                 Browse APIs
+                            </button>
+                            <button
+                                onClick={() => navigate('/playground')}
+                                className="px-4 py-2 text-sm font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                            >
+                                🧪 Playground
+                            </button>
+                            <button
+                                onClick={() => navigate('/analytics')}
+                                className="px-4 py-2 text-sm font-semibold rounded-lg transition-all text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2"
+                            >
+                                <BarChart2 className="w-4 h-4" />
+                                Analytics
                             </button>
                             {deployedAPIs.length > 0 && (
                                 <button
@@ -1391,6 +1421,210 @@ export default function APIBazaar() {
                                                 ))}
                                             </div>
                                         </div>
+
+                                        {/* Custom API Key Input for Currency API */}
+                                        {api.id === 'currency' && (
+                                            <div className="border-t border-slate-100 px-6 pb-6 pt-4" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setShowKeyInput(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors mb-3"
+                                                >
+                                                    <Code className="w-3.5 h-3.5" />
+                                                    {showKeyInput[api.id] ? 'Hide' : 'Add Your Own API Key'}
+                                                    <ChevronRight className={`w-3 h-3 transition-transform ${showKeyInput[api.id] ? 'rotate-90' : ''}`} />
+                                                </button>
+                                                {showKeyInput[api.id] && (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter your ExchangeRate API key"
+                                                            value={customAPIKeys[api.id] || ''}
+                                                            onChange={(e) => setCustomAPIKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
+                                                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                        />
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Get your free key at <a href="https://www.exchangerate-api.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">exchangerate-api.com</a>
+                                                        </p>
+                                                        {customAPIKeys[api.id] && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+                                                                <Check className="w-3 h-3" />
+                                                                Custom key will be used
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Custom API Key Input for Email API */}
+                                        {api.id === 'email' && (
+                                            <div className="border-t border-slate-100 px-6 pb-6 pt-4" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setShowKeyInput(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors mb-3"
+                                                >
+                                                    <Code className="w-3.5 h-3.5" />
+                                                    {showKeyInput[api.id] ? 'Hide' : 'Add Your Own API Key'}
+                                                    <ChevronRight className={`w-3 h-3 transition-transform ${showKeyInput[api.id] ? 'rotate-90' : ''}`} />
+                                                </button>
+                                                {showKeyInput[api.id] && (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter your Resend API key"
+                                                            value={customAPIKeys[api.id] || ''}
+                                                            onChange={(e) => setCustomAPIKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
+                                                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                        />
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Get your free key at <a href="https://resend.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">resend.com</a>
+                                                        </p>
+                                                        {customAPIKeys[api.id] && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+                                                                <Check className="w-3 h-3" />
+                                                                Custom key will be used
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Custom API Key Input for Finance API */}
+                                        {api.id === 'finance' && (
+                                            <div className="border-t border-slate-100 px-6 pb-6 pt-4" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setShowKeyInput(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors mb-3"
+                                                >
+                                                    <Code className="w-3.5 h-3.5" />
+                                                    {showKeyInput[api.id] ? 'Hide' : 'Add Your Own API Key'}
+                                                    <ChevronRight className={`w-3 h-3 transition-transform ${showKeyInput[api.id] ? 'rotate-90' : ''}`} />
+                                                </button>
+                                                {showKeyInput[api.id] && (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter your Alpha Vantage API key"
+                                                            value={customAPIKeys[api.id] || ''}
+                                                            onChange={(e) => setCustomAPIKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
+                                                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                        />
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Get your free key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">alphavantage.co</a>
+                                                        </p>
+                                                        {customAPIKeys[api.id] && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+                                                                <Check className="w-3 h-3" />
+                                                                Custom key will be used
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Custom API Key Input for Notification API */}
+                                        {api.id === 'notification' && (
+                                            <div className="border-t border-slate-100 px-6 pb-6 pt-4" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setShowKeyInput(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors mb-3"
+                                                >
+                                                    <Code className="w-3.5 h-3.5" />
+                                                    {showKeyInput[api.id] ? 'Hide' : 'Add Your Own Twilio Credentials'}
+                                                    <ChevronRight className={`w-3 h-3 transition-transform ${showKeyInput[api.id] ? 'rotate-90' : ''}`} />
+                                                </button>
+                                                {showKeyInput[api.id] && (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="SID:TOKEN:PHONE (e.g., ACxxx:abc123:+1234567890)"
+                                                            value={customAPIKeys[api.id] || ''}
+                                                            onChange={(e) => setCustomAPIKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
+                                                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
+                                                        />
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Format: SID:TOKEN:PHONE separated by colons. Get credentials at <a href="https://www.twilio.com/console" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">twilio.com</a>
+                                                        </p>
+                                                        {customAPIKeys[api.id] && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+                                                                <Check className="w-3 h-3" />
+                                                                Custom credentials will be used
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Custom API Key Input for Movie API */}
+                                        {api.id === 'tmdb' && (
+                                            <div className="border-t border-slate-100 px-6 pb-6 pt-4" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setShowKeyInput(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors mb-3"
+                                                >
+                                                    <Code className="w-3.5 h-3.5" />
+                                                    {showKeyInput[api.id] ? 'Hide' : 'Add Your Own API Key'}
+                                                    <ChevronRight className={`w-3 h-3 transition-transform ${showKeyInput[api.id] ? 'rotate-90' : ''}`} />
+                                                </button>
+                                                {showKeyInput[api.id] && (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Enter your TMDB API Bearer Token"
+                                                            value={customAPIKeys[api.id] || ''}
+                                                            onChange={(e) => setCustomAPIKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
+                                                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono"
+                                                        />
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Get your API key at <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">themoviedb.org</a>
+                                                        </p>
+                                                        {customAPIKeys[api.id] && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+                                                                <Check className="w-3 h-3" />
+                                                                Custom key will be used
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Generic Custom API Key Input for Other APIs */}
+                                        {!['currency', 'email', 'finance', 'notification', 'tmdb', 'gst', 'payment'].includes(api.id) && (
+                                            <div className="border-t border-slate-100 px-6 pb-6 pt-4" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={() => setShowKeyInput(prev => ({ ...prev, [api.id]: !prev[api.id] }))}
+                                                    className="flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors mb-3"
+                                                >
+                                                    <Code className="w-3.5 h-3.5" />
+                                                    {showKeyInput[api.id] ? 'Hide' : 'Add Your Own API Key'}
+                                                    <ChevronRight className={`w-3 h-3 transition-transform ${showKeyInput[api.id] ? 'rotate-90' : ''}`} />
+                                                </button>
+                                                {showKeyInput[api.id] && (
+                                                    <div className="space-y-2">
+                                                        <input
+                                                            type="text"
+                                                            placeholder={`Enter your ${api.provider} API key`}
+                                                            value={customAPIKeys[api.id] || ''}
+                                                            onChange={(e) => setCustomAPIKeys(prev => ({ ...prev, [api.id]: e.target.value }))}
+                                                            className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                        />
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Get your API key from {api.provider}'s developer portal
+                                                        </p>
+                                                        {customAPIKeys[api.id] && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-green-600 font-semibold">
+                                                                <Check className="w-3 h-3" />
+                                                                Custom key will be used
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -1652,6 +1886,14 @@ export default function APIBazaar() {
                         </div>
                     )
                 }
+                {/* Smart Agent Modal */}
+                {showAssistant && (
+                    <SmartAgent
+                        onSelectStack={handleAIStackSelection}
+                        onClose={() => setShowAssistant(false)}
+                        availableApis={AVAILABLE_APIS}
+                    />
+                )}
             </main >
 
             <footer className="max-w-7xl mx-auto px-6 py-12 border-t border-slate-100 text-center">
